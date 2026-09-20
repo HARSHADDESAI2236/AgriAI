@@ -1,0 +1,8 @@
+com.example.farmar.app-pngs-0 D:\AgriAI\app\build\generated\res\pngs\debug
+com.example.farmar.app-updated_navigation_xml-1 D:\AgriAI\app\build\generated\updated_navigation_xml\debug
+com.example.farmar.app-packageDebugResources-2 D:\AgriAI\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.example.farmar.app-packageDebugResources-3 D:\AgriAI\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.example.farmar.app-debug-4 D:\AgriAI\app\build\intermediates\merged_res\debug\mergeDebugResources
+com.example.farmar.app-debug-5 D:\AgriAI\app\src\debug\res
+com.example.farmar.app-main-6 D:\AgriAI\app\src\main\res
+gradleHome-0 C:\Users\naikv\.gradle
