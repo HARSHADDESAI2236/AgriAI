@@ -13,3 +13,20 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Environment and generated files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+
+# Android
+.gradle/
+**/build/
+local.properties
+.idea/
+*.apk
+*.aab
