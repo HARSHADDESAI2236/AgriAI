@@ -1,10 +1,21 @@
+import os
+from typing import cast
 from jose import jwt, JWTError
 from fastapi import HTTPException, status
-
 from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
 
 
-SECRET_KEY = "AGRIAI2026"
+load_dotenv()
+
+
+
+SECRET_KEY = cast(str, os.getenv("SECRET_KEY"))
+
+
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is not configured")
+
 
 ALGORITHM = "HS256"
 
