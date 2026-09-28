@@ -1,7 +1,7 @@
-
 from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from models import User
 from database import get_db
 from dependency import get_current_user
@@ -32,7 +32,6 @@ router = APIRouter(
 async def register_user(
     user: CreateUser,
     db: AsyncSession = Depends(get_db)
-   
 ):
     return await create_user(db, user)
 
@@ -54,6 +53,20 @@ async def login_user(
 
 
 # =========================
+# CURRENT LOGGED-IN USER
+# =========================
+
+@router.get(
+    "/me",
+    response_model=UserResponse
+)
+async def get_my_profile(
+    current_user: User = Depends(get_current_user)
+):
+    return current_user
+
+
+# =========================
 # UPDATE USER
 # =========================
 
@@ -64,7 +77,7 @@ async def login_user(
 async def update_user_route(
     user_id: int,
     user: UpdateUser,
-    current_user:User=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     return await update_user(
@@ -81,7 +94,7 @@ async def update_user_route(
 @router.delete("/{user_id}")
 async def delete_user_route(
     user_id: int,
-    current_user:User=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     return await delete_user(
@@ -89,6 +102,10 @@ async def delete_user_route(
         user_id=user_id
     )
 
+
+# =========================
+# SWAGGER LOGIN
+# =========================
 
 @router.post("/token")
 async def login_for_swagger(
