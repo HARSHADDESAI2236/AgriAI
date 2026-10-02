@@ -406,6 +406,7 @@ async def fertilizer_query(
         }
 
     total_quantity = sum(item.quantity for item in inputs)
+    Input_name=inputs[0].input_name
 
     unit = inputs[0].unit
 
@@ -423,6 +424,6 @@ async def fertilizer_query(
 
     return {
         "question": question,
-        "answer": f"You used {total_quantity:g} {unit} of fertilizer on {crop.name}.",
+        "answer": f"You used {total_quantity:g} {unit} of {Input_name} on {crop.name}.",
         "evidence": evidence
     }
