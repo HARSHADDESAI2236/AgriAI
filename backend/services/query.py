@@ -38,19 +38,19 @@ async def get_user_crops(
 # =========================================================
 
 def select_crops(crops, question: str):
+
     question_lower = question.lower()
 
     mentioned_crops = []
 
     for crop in crops:
+
         if crop.name.lower() in question_lower:
             mentioned_crops.append(crop)
 
-    # If a crop was mentioned, use only that crop
     if mentioned_crops:
         return mentioned_crops
 
-    # Otherwise use all user's crops
     return crops
 
 
@@ -76,6 +76,7 @@ def remove_duplicate_evidence(evidence):
         )
 
         if key not in seen:
+
             seen.add(key)
             unique_evidence.append(item)
 
@@ -94,9 +95,9 @@ async def get_farm_evidence(
 
     question_lower = question.lower()
 
-    # -----------------------------------------------------
+    # =====================================================
     # GET USER CROPS
-    # -----------------------------------------------------
+    # =====================================================
 
     crops = await get_user_crops(
         db=db,
@@ -106,9 +107,9 @@ async def get_farm_evidence(
     if not crops:
         return []
 
-    # -----------------------------------------------------
-    # SELECT RELEVANT CROPS
-    # -----------------------------------------------------
+    # =====================================================
+    # SELECT CROPS
+    # =====================================================
 
     selected_crops = select_crops(
         crops=crops,
@@ -118,7 +119,7 @@ async def get_farm_evidence(
     evidence = []
 
     # =====================================================
-    # DETECT INTENTS
+    # INTENTS
     # =====================================================
 
     fertilizer_intent = any(
@@ -180,7 +181,7 @@ async def get_farm_evidence(
     )
 
     # =====================================================
-    # NO RELEVANT INTENT
+    # NO INTENT
     # =====================================================
 
     if not any([
@@ -190,10 +191,11 @@ async def get_farm_evidence(
         revenue_intent,
         activity_intent
     ]):
+
         return []
 
     # =====================================================
-    # FERTILIZER
+    # FERTILIZER / INPUT
     # =====================================================
 
     if fertilizer_intent:
@@ -202,14 +204,16 @@ async def get_farm_evidence(
 
             # -------------------------------------------------
             # IMPORTANT:
-            # Only fetch records whose input_type is fertilizer
+            # Do NOT filter by input_type here.
+            #
+            # This restores the database behavior that was
+            # previously working.
             # -------------------------------------------------
 
             result = await db.execute(
                 select(Input)
                 .where(
-                    Input.crop_id == crop.id,
-                    Input.input_type.ilike("fertilizer")
+                    Input.crop_id == crop.id
                 )
                 .order_by(Input.application_date)
             )
@@ -220,30 +224,30 @@ async def get_farm_evidence(
                 continue
 
             # -------------------------------------------------
-            # Check whether a specific fertilizer was requested
+            # CHECK SPECIFIC FERTILIZER
+            #
             # Example:
             # "How much Urea did I use?"
             # -------------------------------------------------
 
             specific_input_requested = any(
-                item.input_name.lower() in question_lower
+                item.input_name
+                and item.input_name.lower() in question_lower
                 for item in inputs
-                if item.input_name
             )
 
             # -------------------------------------------------
-            # Add fertilizer evidence
+            # ADD INPUT EVIDENCE
             # -------------------------------------------------
 
             for item in inputs:
 
-                # If user specifically asked for one fertilizer,
-                # only return that fertilizer.
                 if specific_input_requested:
 
                     if (
                         not item.input_name
-                        or item.input_name.lower() not in question_lower
+                        or item.input_name.lower()
+                        not in question_lower
                     ):
                         continue
 
@@ -258,23 +262,15 @@ async def get_farm_evidence(
                 })
 
     # =====================================================
-    # EXPENSES
+    # NORMAL EXPENSES
     # =====================================================
 
-    # IMPORTANT:
+    # Do NOT process this section when the question is about
+    # fertilizer.
     #
-    # If fertilizer_intent is true, DO NOT run the normal
-    # expense section for Input records.
+    # Fertilizer cost is already stored in Input.cost.
     #
-    # Fertilizer costs are already stored in Input.cost.
-    #
-    # This prevents:
-    #
-    # DAP ₹1500
-    # Urea ₹1200
-    #
-    # from being added twice.
-    #
+    # This prevents duplicate fertilizer costs.
     # =====================================================
 
     if expense_intent and not fertilizer_intent:
@@ -295,7 +291,6 @@ async def get_farm_evidence(
 
             inputs = result.scalars().all()
 
-            # Check whether a specific input was requested
             specific_input_requested = any(
                 item.input_name
                 and item.input_name.lower() in question_lower
@@ -308,7 +303,8 @@ async def get_farm_evidence(
 
                     if (
                         not item.input_name
-                        or item.input_name.lower() not in question_lower
+                        or item.input_name.lower()
+                        not in question_lower
                     ):
                         continue
 
@@ -323,7 +319,7 @@ async def get_farm_evidence(
                 })
 
             # -------------------------------------------------
-            # NORMAL EXPENSES
+            # EXPENSE TABLE
             # -------------------------------------------------
 
             result = await db.execute(
@@ -338,7 +334,8 @@ async def get_farm_evidence(
 
             specific_expense_requested = any(
                 expense.expense_type
-                and expense.expense_type.lower() in question_lower
+                and expense.expense_type.lower()
+                in question_lower
                 for expense in expenses
             )
 
@@ -427,9 +424,7 @@ async def get_farm_evidence(
     # REMOVE DUPLICATES
     # =====================================================
 
-    evidence = remove_duplicate_evidence(evidence)
-
-    return evidence
+    return remove_duplicate_evidence(evidence)
 
 
 # =========================================================
@@ -449,13 +444,14 @@ async def get_farm_data_for_ai(
     )
 
     if not evidence:
+
         return "No relevant farm records found for this question."
 
     return str(evidence)
 
 
 # =========================================================
-# FERTILIZER QUERY
+# DIRECT FERTILIZER QUERY
 # =========================================================
 
 async def fertilizer_query(
@@ -490,23 +486,18 @@ async def fertilizer_query(
         )
 
     # -----------------------------------------------------
-    # GET FERTILIZER INPUTS
+    # GET ALL INPUTS
     # -----------------------------------------------------
 
     result = await db.execute(
         select(Input)
         .where(
-            Input.crop_id == crop.id,
-            Input.input_type.ilike("fertilizer")
+            Input.crop_id == crop.id
         )
         .order_by(Input.application_date)
     )
 
     inputs = result.scalars().all()
-
-    # -----------------------------------------------------
-    # NO RECORDS
-    # -----------------------------------------------------
 
     if not inputs:
 
@@ -515,6 +506,22 @@ async def fertilizer_query(
             "answer": f"No fertilizer records found for {crop.name}.",
             "evidence": []
         }
+
+    # -----------------------------------------------------
+    # FERTILIZER NAMES
+    # -----------------------------------------------------
+
+    fertilizer_names = []
+
+    for item in inputs:
+
+        if item.input_name:
+
+            if item.input_name not in fertilizer_names:
+
+                fertilizer_names.append(
+                    item.input_name
+                )
 
     # -----------------------------------------------------
     # TOTAL QUANTITY
@@ -527,34 +534,23 @@ async def fertilizer_query(
     )
 
     # -----------------------------------------------------
-    # BUILD FERTILIZER NAMES
-    # -----------------------------------------------------
-
-    fertilizer_names = []
-
-    for item in inputs:
-
-        if item.input_name:
-            if item.input_name not in fertilizer_names:
-                fertilizer_names.append(item.input_name)
-
-    # -----------------------------------------------------
-    # BUILD ANSWER
+    # BUILD NAME TEXT
     # -----------------------------------------------------
 
     if len(fertilizer_names) == 1:
 
-        fertilizer_names_text = fertilizer_names[0]
+        names_text = fertilizer_names[0]
 
     elif len(fertilizer_names) == 2:
 
-        fertilizer_names_text = (
-            f"{fertilizer_names[0]} and {fertilizer_names[1]}"
+        names_text = (
+            f"{fertilizer_names[0]} "
+            f"and {fertilizer_names[1]}"
         )
 
     else:
 
-        fertilizer_names_text = (
+        names_text = (
             ", ".join(fertilizer_names[:-1])
             + f", and {fertilizer_names[-1]}"
         )
@@ -584,8 +580,9 @@ async def fertilizer_query(
     return {
         "question": question,
         "answer": (
-            f"You used {fertilizer_names_text} on {crop.name}. "
-            f"The total quantity was {total_quantity:g} {inputs[0].unit}."
+            f"You used {names_text} on {crop.name}. "
+            f"The total quantity was "
+            f"{total_quantity:g} {inputs[0].unit}."
         ),
         "evidence": evidence
     }
