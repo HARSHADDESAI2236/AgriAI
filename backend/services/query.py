@@ -73,49 +73,64 @@ async def get_farm_evidence(
     # DETECT INTENTS
     # -----------------------------------------------------
 
-    fertilizer_intent = any(word in question_lower for word in [
-        "fertilizer",
-        "fertiliser",
-        "urea",
-        "dap",
-        "input"
-    ])
+    fertilizer_intent = any(
+        word in question_lower
+        for word in [
+            "fertilizer",
+            "fertiliser",
+            "urea",
+            "dap",
+            "input"
+        ]
+    )
 
-    expense_intent = any(word in question_lower for word in [
-        "spend",
-        "spent",
-        "expense",
-        "expenses",
-        "cost",
-        "costs"
-    ])
+    expense_intent = any(
+        word in question_lower
+        for word in [
+            "spend",
+            "spent",
+            "expense",
+            "expenses",
+            "cost",
+            "costs"
+        ]
+    )
 
-    harvest_intent = any(word in question_lower for word in [
-        "harvest",
-        "harvested",
-        "yield",
-        "produce",
-        "production"
-    ])
+    harvest_intent = any(
+        word in question_lower
+        for word in [
+            "harvest",
+            "harvested",
+            "yield",
+            "produce",
+            "production"
+        ]
+    )
 
-    revenue_intent = any(word in question_lower for word in [
-        "earn",
-        "earned",
-        "earning",
-        "revenue",
-        "income",
-        "sold",
-        "selling",
-        "money from"
-    ])
+    revenue_intent = any(
+        word in question_lower
+        for word in [
+            "earn",
+            "earned",
+            "earning",
+            "revenue",
+            "income",
+            "sold",
+            "selling",
+            "money from"
+        ]
+    )
 
-    activity_intent = any(word in question_lower for word in [
-        "activity",
-        "activities",
-        "work",
-        "worked",
-        "performed"
-    ])
+    activity_intent = any(
+        word in question_lower
+        for word in [
+            "activity",
+            "activities",
+            "work",
+            "worked",
+            "performed"
+        ]
+    )
 
     # -----------------------------------------------------
     # IF QUESTION DOES NOT MATCH ANY INTENT
@@ -146,90 +161,62 @@ async def get_farm_evidence(
 
             inputs = result.scalars().all()
 
-            for item in inputs:
-
-                # If a specific input name is mentioned,
-                # only return that input.
-                specific_input = (
-                    item.input_name.lower() in question_lower
-                )
-
-                generic_fertilizer_question = any(
-                    word in question_lower
-                    for word in ["fertilizer", "fertiliser", "input"]
-                )
-
-                if specific_input or generic_fertilizer_question:
-
-                    evidence.append({
-                        "type": "input",
-                        "name": item.input_name,
-                        "quantity": item.quantity,
-                        "unit": item.unit,
-                        "amount": item.cost,
-                        "date": item.application_date,
-                        "description": item.description
-                    })
-
-    # -----------------------------------------------------
-    # EXPENSES / SPENDING
-    # -----------------------------------------------------
-
-    if expense_intent:
-
-        for crop in selected_crops:
-
-            # ---------------------------------------------
-            # INPUT COSTS
-            # ---------------------------------------------
-
-            result = await db.execute(
-                select(Input)
-                .where(Input.crop_id == crop.id)
-                .order_by(Input.application_date)
+            # Check whether a specific input was requested
+            specific_input_requested = any(
+                item.input_name.lower() in question_lower
+                for item in inputs
             )
 
-            inputs = result.scalars().all()
-
             for item in inputs:
 
-                specific_input = (
-                    item.input_name.lower() in question_lower
-                )
+                # Specific input:
+                # "How much Urea did I use?"
+                if specific_input_requested:
 
-                # If a specific input such as Urea or DAP
-                # is mentioned, only return that input.
-                if specific_input:
+                    if item.input_name.lower() not in question_lower:
+                        continue
 
-                    evidence.append({
-                        "type": "input",
-                        "name": item.input_name,
-                        "quantity": item.quantity,
-                        "unit": item.unit,
-                        "amount": item.cost,
-                        "date": item.application_date,
-                        "description": item.description
-                    })
-
-                # Generic spending question
+                # Generic fertilizer question:
+                # "What fertilizer did I use?"
+                # "How much fertilizer did I use?"
+                # "How much did I spend on fertilizer?"
                 elif not any(
-                    name.lower() in question_lower
-                    for name in [i.input_name for i in inputs]
+                    word in question_lower
+                    for word in [
+                        "fertilizer",
+                        "fertiliser",
+                        "input"
+                    ]
                 ):
+                    continue
 
-                    evidence.append({
-                        "type": "input",
-                        "name": item.input_name,
-                        "quantity": item.quantity,
-                        "unit": item.unit,
-                        "amount": item.cost,
-                        "date": item.application_date,
-                        "description": item.description
-                    })
+                evidence.append({
+                    "type": "input",
+                    "name": item.input_name,
+                    "quantity": item.quantity,
+                    "unit": item.unit,
+                    "amount": item.cost,
+                    "date": item.application_date,
+                    "description": item.description
+                })
 
-            # ---------------------------------------------
-            # OTHER EXPENSES
-            # ---------------------------------------------
+    # -----------------------------------------------------
+    # OTHER EXPENSES
+    # -----------------------------------------------------
+    #
+    # IMPORTANT:
+    # Do NOT add fertilizer/input records here.
+    #
+    # Fertilizer costs are already represented by Input.cost.
+    # Adding them again here causes:
+    #
+    # ₹2500 + ₹2500 = ₹5000
+    #
+    # -----------------------------------------------------
+
+    if expense_intent and not fertilizer_intent:
+
+        for crop in selected_crops:
 
             result = await db.execute(
                 select(Expense)
@@ -239,40 +226,27 @@ async def get_farm_evidence(
 
             expenses = result.scalars().all()
 
+            specific_expense_requested = any(
+                expense.expense_type.lower() in question_lower
+                for expense in expenses
+            )
+
             for expense in expenses:
 
-                specific_expense = (
-                    expense.expense_type.lower() in question_lower
-                )
+                if specific_expense_requested:
 
-                # Specific expense such as Tractor/Labour
-                if specific_expense:
+                    if expense.expense_type.lower() not in question_lower:
+                        continue
 
-                    evidence.append({
-                        "type": "expense",
-                        "name": expense.expense_type,
-                        "quantity": None,
-                        "unit": None,
-                        "amount": expense.amount,
-                        "date": expense.expense_date,
-                        "description": expense.description
-                    })
-
-                # Generic spending question
-                elif not any(
-                    e.expense_type.lower() in question_lower
-                    for e in expenses
-                ):
-
-                    evidence.append({
-                        "type": "expense",
-                        "name": expense.expense_type,
-                        "quantity": None,
-                        "unit": None,
-                        "amount": expense.amount,
-                        "date": expense.expense_date,
-                        "description": expense.description
-                    })
+                evidence.append({
+                    "type": "expense",
+                    "name": expense.expense_type,
+                    "quantity": None,
+                    "unit": None,
+                    "amount": expense.amount,
+                    "date": expense.expense_date,
+                    "description": expense.description
+                })
 
     # -----------------------------------------------------
     # HARVEST
@@ -330,7 +304,31 @@ async def get_farm_evidence(
                     "description": activity.description
                 })
 
-    return evidence
+    # -----------------------------------------------------
+    # REMOVE DUPLICATE RECORDS
+    # -----------------------------------------------------
+
+    unique_evidence = []
+    seen = set()
+
+    for item in evidence:
+
+        key = (
+            item["type"],
+            item["name"],
+            item["quantity"],
+            item["unit"],
+            item["amount"],
+            item["date"],
+            item["description"]
+        )
+
+        if key not in seen:
+
+            seen.add(key)
+            unique_evidence.append(item)
+
+    return unique_evidence
 
 
 # ---------------------------------------------------------
@@ -405,14 +403,19 @@ async def fertilizer_query(
             "evidence": []
         }
 
-    total_quantity = sum(item.quantity for item in inputs)
-    Input_name=inputs[0].input_name
+    total_quantity = sum(
+        item.quantity
+        for item in inputs
+    )
+
+    input_name=inputs[0].input_name
 
     unit = inputs[0].unit
 
     evidence = []
 
     for item in inputs:
+
         evidence.append({
             "type": "input",
             "name": item.input_name,
@@ -424,6 +427,9 @@ async def fertilizer_query(
 
     return {
         "question": question,
-        "answer": f"You used {total_quantity:g} {unit} of {Input_name} on {crop.name}.",
+        "answer": (
+            f"You used {total_quantity:g} "
+            f"{unit} of {input_name} on {crop.name}."
+        ),
         "evidence": evidence
     }
