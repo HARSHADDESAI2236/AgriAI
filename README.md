@@ -811,8 +811,3 @@ Domain: AgriTech
 📄 License
 
 This project was developed as a hackathon prototype.
-
-
-This version is suitable as the **root `README.md` for the AgriAI GitHub repository** and keeps the focus on the actual project rather than the development process.
-
-Would you like the README tailored for a hackathon submission or a production-ready open-source project?
